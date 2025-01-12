@@ -1,6 +1,7 @@
 import {Router} from 'express'
-import { logInUser, registerUser } from '../controllers/user.controllers.js'
+import { logInUser, registerUser, logOutUser } from '../controllers/user.controllers.js'
 import { upload } from '../middlewares/multer.middleware.js'
+import { verifyJWT } from '../middlewares/auth.middleware.js'
 
 const router = Router()
 
@@ -21,6 +22,9 @@ router.route('/register').post(
 )
 
 // login route
-router.route('/login', logInUser)
+router.route('/login').post(logInUser)
+
+// logout route added middleware to get user to logged out
+router.route('/logout').post(verifyJWT, logOutUser)
 
 export default router
