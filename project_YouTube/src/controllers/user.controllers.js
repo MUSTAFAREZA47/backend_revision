@@ -29,7 +29,7 @@ const registerUser = asyncHandler(async (req, res) => {
   }
 
   // checking if user is already exists
-  const existedUser = User.findOne({
+  const existedUser = await User.findOne({
     $or: [{ username }, { email }],
   });
 
@@ -39,6 +39,7 @@ const registerUser = asyncHandler(async (req, res) => {
 
   // checking if avatar file is uploaded on local server
   const avatarLocalPath = req.files?.avatar[0]?.path;
+  // console.log(avatarLocalPath);
   const coverImageLocalPath = req.files?.avatar[0]?.path;
 
   if (!avatarLocalPath) {
@@ -47,11 +48,12 @@ const registerUser = asyncHandler(async (req, res) => {
 
   // uploading avatar file on cloudinary
   const avatar = await uploadOnCloudinary(avatarLocalPath);
+  // console.log(avatar);
   const coverImage = await uploadOnCloudinary(coverImageLocalPath);
 
   // checking if avatar uploaded on cloudinary
-  if (avatar) {
-    throw new ApiError(400, "Avatar is required");
+  if (!avatar) {
+    throw new ApiError(400, "Avatar file is required");
   }
 
   // creating user in database
@@ -81,4 +83,80 @@ const registerUser = asyncHandler(async (req, res) => {
 
 });
 
-export { registerUser };
+const logInUser = asyncHandler( async (req, res) => {
+  // take email or username and password from user
+  // find user
+  // password check
+  // generate access and refresh token
+  // send cookies to user
+
+  const {username, email, password} = req.body
+   
+  // if any field is not empty
+  let requiredFields = {username, email, password}
+  for (const [field, value] of Object.entries(requiredFields)) {
+    if (!value) {
+      throw new ApiError(400, `${field} is required`)
+    }
+  }
+
+  // find user
+  const user = await User.findOne({
+    $or: [{username}, {email}]
+  })
+
+  if (!user) {
+    throw new ApiError(401, "User does not exist")
+  }
+
+  // check password
+  const isPasswordValid = await user.isPasswordCorrect(password)
+
+  if (!isPasswordValid) {
+    throw new ApiError(400, "Incorrect Password")
+  }
+
+  // generate access and refresh token
+  const generateAccessAndRefreshToken = async (userId) => {
+    try {
+      const user = await User.findById(userId)
+      const accessToken = user.generateAccessToken()
+      const refreshToken = user.generateRefreshToken()
+
+      // add refresh token into database
+      user.refreshToken = refreshToken
+
+      await user.save( {validateBeforeSave: false})
+
+      return {accessToken, refreshToken}
+
+    } catch (error) {
+      throw new ApiError(500, "Something went wrong in generating access and refresh token")
+    }
+  }
+
+  const {accessToken, refreshToken} = generateAccessAndRefreshToken(user._id)
+  const loggedUser =  await User.findById(user._id).select("-password -refreshToken")
+
+  // send cookies to user
+   const options = {
+    httpOnly: true,
+    secure: true
+   }
+
+   return res.status(200)
+   .cookie("accessToken", accessToken, options)
+   .cookie("refreshToken", refreshToken, options)
+   .json(new ApiResponse(
+      200,
+      {
+        data: loggedUser, accessToken, refreshToken
+      },
+      "User logged Successfully"
+    ))
+
+
+
+})
+
+export { registerUser, logInUser };
