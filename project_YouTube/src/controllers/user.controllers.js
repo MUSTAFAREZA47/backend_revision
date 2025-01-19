@@ -257,4 +257,151 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
     );
 });
 
-export { registerUser, logInUser, logOutUser, refreshAccessToken };
+const changeCurrentPassword = asyncHandler(async (req, res) => {
+
+  const {oldPassword, newPassword, confirmNewPassword} = req.body
+
+  if (newPassword !== confirmNewPassword) {
+    throw new ApiError(400, "New password and Confirm password did not match")
+  }
+
+  // finding user who wants to change the password, so we have req.user._id to find that exact user to change password.
+  const user =  await User.findById(req.user?._id)
+
+  // checking user's old password if it's correct or not, then he will be able to change password.
+  const isPasswordCorrect = await user.isPasswordCorrect(oldPassword)
+
+  if (!isPasswordCorrect) {
+    throw new ApiError(401, "Invalid Old Password")
+  }
+
+  user.password = newPassword
+  await  user.save({validateBeforeSave: false})
+
+  return res
+  .status(200)
+  .json(
+    new ApiResponse(
+      200,
+      {},
+      "Password has been changed successfully"
+    )
+  )
+
+})
+
+const getCurrentUser = asyncHandler( async (req, res) => {
+
+  return res
+  .status(200)
+  .json(
+    new ApiResponse(
+      200,
+      req.user,
+      "Current user fetched successfully"
+    )
+  )
+})
+
+const updateUsernameAndFullname = asyncHandler ( async (req, res) => {
+  const {fullname, username} = req.body
+
+  if (!(fullname && username)) {
+    throw new ApiError(400, "fullname and username is required")
+  }
+
+  const updatedUserDetails = await User.findByIdAndUpdate(
+    req.user?._id,
+    {
+      $set: {fullname, username}
+    },
+    {new: true}
+  ).select("-password, -refreshToken")
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        updatedUserDetails,
+        "fullname and username has been updated"
+      )
+    );
+
+}) 
+
+const updateUserAvatar = asyncHandler ( async (req, res) => {
+  // as we already inject multer middleware, so it giving access of file in req and res
+  const avatarLocalPath = req.file?.path
+
+  if (!avatarLocalPath) {
+    throw new ApiError(401, "Avatar file is missing")
+  }
+
+  const avatar = await uploadOnCloudinary(avatarLocalPath)
+
+  if (!avatar.url) {
+    throw new ApiError(400, "Error while uploading avatar")
+  }
+
+  const user = await User.findByIdAndUpdate(
+    req.user?._id,
+    {
+      $set: {
+        avatar: avatar.url
+      }
+    },
+    {new: true}
+  ).select("-password, -refreshToken")
+
+  return res
+  .status(200)
+  .json(
+    new ApiResponse(
+      200,
+      user,
+      "Avatar changed successfully"
+    )
+  )
+})
+
+const updateUserCoverImage = asyncHandler(async (req, res) => {
+  // as we already inject multer middleware, so it giving access of file in req and res
+  const coverImageLocalPath = req.file?.path;
+
+  if (!coverImageLocalPath) {
+    throw new ApiError(401, "Cover-Image file is missing");
+  }
+
+  const coverImage = await uploadOnCloudinary(coverImageLocalPath);
+
+  if (!coverImage.url) {
+    throw new ApiError(400, "Error while uploading coverImage");
+  }
+
+  const user = await User.findByIdAndUpdate(
+    req.user?._id,
+    {
+      $set: {
+        coverImage: coverImage.url,
+      },
+    },
+    { new: true }
+  ).select("-password, -refreshToken");
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, user, "Cover-Image changed successfully"));
+});
+
+export {
+  registerUser,
+  logInUser,
+  logOutUser,
+  refreshAccessToken,
+  changeCurrentPassword,
+  getCurrentUser,
+  updateUsernameAndFullname,
+  updateUserAvatar,
+  updateUserCoverImage
+};
