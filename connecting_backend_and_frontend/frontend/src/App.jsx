@@ -3,6 +3,7 @@ import reactLogo from './assets/react.svg'
 import viteLogo from '/vite.svg'
 import './App.css'
 import axios from 'axios'
+import Card from './components/Card'
 
 function App() {
   const [product, setProduct] = useState([])
@@ -14,7 +15,7 @@ function App() {
             setProduct(response.data)
             console.log(response.data)
         })
-        .catch(response => {
+        .catch(error => {
             console.log(error)
         })
   }, [])
@@ -25,9 +26,11 @@ function App() {
           <h1>Number of Products: {product.length}</h1>
 
           {product.map((item) => (
-              <div key={item.id}>
-                  <h2>{item.product_item}</h2>
-                  <p>{item.product_description}</p>
+              <div className="mt-4 flex justify-center" key={item.id}>
+                  <Card
+                      title={item.product_item}
+                      description={item.product_description}
+                  />
               </div>
           ))}
       </>
